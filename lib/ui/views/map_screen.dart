@@ -35,6 +35,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 zoom: 14,
               ),
               onMapCreated: (MapboxMap mapboxMap) {
+                mapboxMap.location.updateSettings(
+                  const LocationComponentSettings(
+                    enabled: true,
+                    pulsingEnabled: true,
+                  ),
+                );
               },
             ),
     );

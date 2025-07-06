@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'ui/views/map_screen.dart';
+import 'ui/views/home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Map App',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const MapScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/current_location': (context) => const MapScreen(),
+      },
     );
   }
 }
