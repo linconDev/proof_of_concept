@@ -10,6 +10,7 @@ import '../../providers.dart';
 import '../../domain/models/location.dart';
 import '../../domain/models/photo_marker.dart';
 import '../widgets/photo_detail_dialog.dart';
+import '../widgets/quick_description_dialog.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -22,6 +23,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapboxMap? _map;
   PolylineAnnotationManager? _lineManager;
   PointAnnotationManager? _photoAnnotationManager;
+  final Map<String, PhotoMarker> _annotationToPhotoMap = {};
 
   @override
   void initState() {
@@ -101,7 +103,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       // Botão para câmera
                       FloatingActionButton(
                         heroTag: "camera",
-                        onPressed: () => ref.read(mapViewModelProvider).capturePhoto(),
+                        onPressed: () => _capturePhotoWithQuickDescription(),
                         backgroundColor: Colors.blue,
                         child: const Icon(Icons.camera_alt, color: Colors.white),
                       ),
@@ -140,6 +142,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     // Limpa marcadores anteriores
     await _photoAnnotationManager!.deleteAll();
+    _annotationToPhotoMap.clear();
 
     // Cria marcadores para cada foto
     for (final photoMarker in photoMarkers) {
@@ -158,11 +161,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           iconSize: 1.0,
         );
 
-        await _photoAnnotationManager!.create(pointAnnotationOptions);
+        final annotation = await _photoAnnotationManager!.create(pointAnnotationOptions);
+        
+        // Mapeia o ID da anotação para o PhotoMarker
+        _annotationToPhotoMap[annotation.id] = photoMarker;
       } catch (e) {
         debugPrint('Erro ao criar marcador de foto: $e');
       }
     }
+
+    // Configura o listener para cliques nas anotações apenas uma vez
+    if (_annotationToPhotoMap.isNotEmpty && !_hasAnnotationListener) {
+      _setupAnnotationClickListener();
+    }
+  }
+
+  bool _hasAnnotationListener = false;
+
+  void _setupAnnotationClickListener() {
+    _hasAnnotationListener = true;
+    // Por enquanto, vamos simplificar e usar apenas a galeria para acessar as fotos
+    // O clique direto nos marcadores será implementado numa versão futura
+    // quando o Mapbox Flutter oferecer melhor suporte para eventos de clique em anotações
   }
 
   Future<Uint8List> _createCircularPhotoMarker(String imagePath) async {
@@ -293,6 +313,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                               File(photoMarker.imagePath),
                               fit: BoxFit.cover,
                             ),
+                            // Botão para focar no mapa
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  _focusOnPhotoMarker(photoMarker);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.9),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
                             Positioned(
                               bottom: 0,
                               left: 0,
@@ -350,5 +393,76 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         },
       ),
     );
+  }
+
+  void _capturePhotoWithQuickDescription() async {
+    await ref.read(mapViewModelProvider).capturePhoto((photoId) {
+      // Mostra o dialog de descrição rápida após capturar a foto
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => QuickDescriptionDialog(
+          onDescriptionEntered: (description) {
+            if (description.isNotEmpty) {
+              ref.read(mapViewModelProvider).updatePhotoDescription(
+                photoId,
+                description,
+              );
+            }
+          },
+        ),
+      );
+    });
+  }
+
+  void _focusOnPhotoMarker(PhotoMarker photoMarker) async {
+    if (_map != null) {
+      // Anima a câmera para focar no marcador da foto
+      await _map!.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(
+              photoMarker.longitude,
+              photoMarker.latitude,
+            ),
+          ),
+          zoom: 18.0, // Zoom bem próximo para destacar o marcador
+        ),
+        MapAnimationOptions(duration: 1500),
+      );
+
+      // Mostra um snackbar indicando a foto
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.camera_alt, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    photoMarker.description.isNotEmpty 
+                        ? photoMarker.description
+                        : 'Foto capturada em ${_formatDateTime(photoMarker.timestamp)}',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    _showPhotoDetail(photoMarker);
+                  },
+                  child: const Text(
+                    'VER',
+                    style: TextStyle(color: Colors.yellow),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 }

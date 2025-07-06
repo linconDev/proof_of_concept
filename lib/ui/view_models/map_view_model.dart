@@ -29,7 +29,7 @@ class MapViewModel extends ChangeNotifier {
   List<Location> get path => List.unmodifiable(_path);
   List<PhotoMarker> get photoMarkers => List.unmodifiable(_photoMarkers);
 
-  Future<void> capturePhoto() async {
+  Future<void> capturePhoto([Function(String)? onPhotoReadyForDescription]) async {
     if (currentLocation == null) return;
 
     try {
@@ -56,12 +56,17 @@ class MapViewModel extends ChangeNotifier {
           latitude: currentLocation!.latitude,
           longitude: currentLocation!.longitude,
           imagePath: savedPath,
-          description: '', // Será preenchido depois
+          description: '', // Será preenchido pelo callback
           timestamp: DateTime.now(),
         );
 
         _photoMarkers.add(photoMarker);
         notifyListeners();
+
+        // Chama o callback para solicitar descrição imediata
+        if (onPhotoReadyForDescription != null) {
+          onPhotoReadyForDescription(timestamp);
+        }
       }
     } catch (e) {
       debugPrint('Erro ao capturar foto: $e');
