@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Este app precisa acessar a câmera para capturar fotos durante o trajeto</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Este app precisa acessar a galeria de fotos para salvar as fotos capturadas</string>
 </dict>
 </plist>
