@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -14,36 +16,23 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   MapboxMap? _map;
   PolylineAnnotationManager? _lineManager;
-  PolylineAnnotation? _line;
 
   @override
   void initState() {
     super.initState();
     ref.read(mapViewModelProvider).initialize();
-    ref.listen(mapViewModelProvider, (_, vm) {
-      _updateLine(vm.path);
-    });
-  }
-
-  Future<void> _updateLine(List<Location> path) async {
-    if (_lineManager == null || path.length < 2) return;
-    final coords = path
-        .map((e) => Position(e.longitude, e.latitude))
-        .toList();
-    final options = PolylineAnnotationOptions(
-      geometry: LineString(coordinates: coords),
-      lineColor: "#0000ff",
-      lineWidth: 4.0,
-    );
-    if (_line != null) {
-      await _lineManager!.delete(_line!);
-    }
-    _line = await _lineManager!.create(options);
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = ref.watch(mapViewModelProvider);
+
+    // Atualiza a linha sempre que o path mudar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_lineManager != null && vm.path.isNotEmpty) {
+        _updateLine(vm.path);
+      }
+    });
 
     return Scaffold(
       body: vm.currentLocation == null
@@ -60,16 +49,41 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
               onMapCreated: (MapboxMap mapboxMap) async {
                 _map = mapboxMap;
-                _lineManager = _map!.annotations.createPolylineAnnotationManager();
+                _lineManager = await _map!.annotations.createPolylineAnnotationManager();
                 _map!.location.updateSettings(
-                  const LocationComponentSettings(
+                  LocationComponentSettings(
                     enabled: true,
                     pulsingEnabled: true,
                   ),
                 );
-                _updateLine(ref.read(mapViewModelProvider).path);
+                _updateLine(vm.path);
+              },
+              onStyleLoadedListener: (StyleLoadedEventData data) {
+                _updateLine(vm.path);
               },
             ),
     );
+  }
+
+  void _updateLine(List<Location> path) async {
+    if (_lineManager == null || path.length < 2) return;
+
+    // Limpa linhas anteriores
+    await _lineManager!.deleteAll();
+
+    // Converte o path em uma lista de Position para o Mapbox
+    final coordinates = path.map((location) => Position(
+      location.longitude,
+      location.latitude,
+    )).toList();
+
+    // Cria a linha
+    final polylineAnnotationOptions = PolylineAnnotationOptions(
+      geometry: LineString(coordinates: coordinates),
+      lineColor: Colors.blue.value,
+      lineWidth: 4.0,
+    );
+
+    await _lineManager!.create(polylineAnnotationOptions);
   }
 }
